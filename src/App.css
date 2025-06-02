@@ -1,0 +1,92 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+/* --- leaderboard --- */
+.lb-wrapper {
+  max-width: 360px;
+  margin: 2rem auto; /* <- centers block */
+  text-align: center;
+}
+
+.lb-title {
+  margin-bottom: 0.75rem;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.lb-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff10; /* subtle glass look */
+  backdrop-filter: blur(6px);
+  border-radius: 0.75rem;
+  overflow: hidden; /* clip inner borders */
+  box-shadow: 0 6px 18px -6px #0007;
+}
+
+.lb-table th,
+.lb-table td {
+  padding: 0.6rem 0.4rem;
+}
+
+.lb-table thead {
+  background: #1f2937; /* dark header strip */
+  color: #fff;
+}
+
+.lb-table tbody tr:nth-child(odd) {
+  background: #ffffff06; /* zebra rows */
+}
+
+.lb-table tbody tr:nth-child(even) {
+  background: #ffffff12;
+}
+
+.lb-table tbody tr:hover {
+  background: #3b82f680; /* highlight on hover */
+}
+
+.lb-table td:first-child {
+  font-weight: 600; /* bold rank */
+  width: 3.5rem;
+}

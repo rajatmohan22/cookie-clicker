@@ -1,0 +1,18 @@
+version: "3.8"
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: mysecret
+    volumes:
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-database.sql
+      - clickhouse-data:/var/lib/clickhouse
+      - clickhouse-logs:/var/log/clickhouse-server
+
+volumes:
+  clickhouse-data:
+  clickhouse-logs:
