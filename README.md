@@ -1,89 +1,36 @@
-## Table of Contents
-
-1. [Features](#features)  
-2. [Architecture Overview](#architecture-overview)  
-3. [Prerequisites](#prerequisites)  
-4. [Getting Started](#getting-started)  
-   1. [Clone the Repo](#clone-the-repo)  
-   2. [Environment Variables](#environment-variables)  
-   3. [Starting Redis](#starting-redis)  
-   4. [Starting ClickHouse](#starting-clickhouse)  
-   5. [Installing Dependencies](#installing-dependencies)  
-   6. [Running the Backend](#running-the-backend)  
-   7. [Running the Front End](#running-the-front-end)  
-5. [Endpoints & Usage](#endpoints--usage)  
-   1. [`POST /hit` (Redis mode)](#post-hit-redis-mode)  
-   2. [`POST /hit-fast` (ClickHouse mode)](#post-hit-fast-clickhouse-mode)  
-   3. [`GET /` (Health Check)](#get--health-check)  
-   4. [WebSocket `/leaderboard` Events](#websocket-leaderboard-events)  
-6. [Benchmarking with `hey`](#benchmarking-with-hey)  
-   1. [Redis-Only Throughput](#redis-only-throughput)  
-   2. [ClickHouse Batched Throughput](#clickhouse-batched-throughput)  
-7. [Configuration & Tuning](#configuration--tuning)  
-   1. [Batching Parameters](#batching-parameters)  
-   2. [Leaderboard Polling Interval](#leaderboard-polling-interval)  
-8. [Understanding the Results](#understanding-the-results)  
-9. [Why `/hit-fast` Is Legitimate](#why-hit-fast-is-legitimate)  
-10. [Contributing](#contributing)  
-11. [License](#license)  
-
----
-
 ## Features
 
-- **Dual-Mode Backend**: Switch between Redis and ClickHouse via the `DB` environment variable  
-- **Redis Mode**:  
-  - `INCR` (or `ZINCRBY`) per click  
-  - Pure-increment endpoint for ~29 k req/sec  
-  - (Optional) Live ranking on every click for ~10 k req/sec  
-- **ClickHouse Mode**:  
-  - `/hit-fast` pushes clicks into an in-memory buffer  
-  - Bulk inserts into ClickHouse every 50 ms (or once 500 rows accumulate)  
-  - Leaderboard computed every 250 ms  
-  - Achieves up to ~49 k req/sec once warmed  
-- **WebSocket Leaderboard**: Clients subscribe to real-time “top 10” updates broadcast by the server  
-- **Simple React Front End**: Click a “🍪 HIT ME!” button, view live leaderboard  
-- **Benchmarks Included**: Example `hey` commands and sample output show exact requests/sec and latency metrics  
+- Dual-mode backend supporting **Redis** and **ClickHouse**  
+- Real-time leaderboard via WebSockets  
+- Batched writes for ClickHouse (`/hit-fast`) to maximize throughput  
+- Simple React front end for “cookie-clicker” clicks and leaderboard display  
+- Included `hey` benchmarking scripts for performance comparison  
 
 ---
 
 ## Architecture Overview
 
-1. **Browser Clients (React)**  
-   - Display a big “🍪 HIT ME!” button and a top-10 leaderboard  
-   - On click: send `POST /hit` (Redis mode) or `POST /hit-fast` (ClickHouse mode)  
-   - Maintain a WebSocket connection to receive `leaderboard` events from the backend  
+1. **Frontend (React + Vite)**  
+   - “🍪 HIT ME!” button triggers a POST to `/hit` (Redis) or `/hit-fast` (ClickHouse)  
+   - Maintains a Socket.io connection to receive live “leaderboard” events  
 
-2. **Backend (Node.js + Express, using Socket.io)**  
-   - Reads `DB=redis` or `DB=clickhouse` from environment  
-   - **Redis Mode (`DB=redis`)**:  
-     - `/hit` endpoint runs `redis.zincrby("clicks", 1, user)` per click  
-     - `BroadcastLB()` fetches top 10 via `redis.zrevrange("clicks", 0, 9, "WITHSCORES")` and emits via WebSocket  
-   - **ClickHouse Mode (`DB=clickhouse`)**:  
-     - `/hit-fast` endpoint simply buffers `{user, clicks: 1}` in an in-memory array  
-     - Every 50 ms (or once buffer ≥ 500 rows), `flushBuffer()` bulk-inserts into ClickHouse  
-     - Every 250 ms, `BroadcastLB()` runs a  
-       ```sql
-       SELECT user, sum(clicks) AS clicks
-       FROM   clickgame.clicks
-       GROUP  BY user
-       ORDER  BY clicks DESC
-       LIMIT  {n:UInt8}
-       ```  
-       query and emits via WebSocket  
+2. **Backend (Node.js + Express + Socket.io)**  
+   - Reads `DB` environment variable to choose between Redis or ClickHouse mode  
+   - **Redis mode**: each click runs `ZINCRBY("clicks", 1, user)` and immediately broadcasts top‐10 via `ZREVRANGE`  
+   - **ClickHouse mode**: `/hit-fast` pushes events into an in-memory buffer; every 50 ms (or 500 rows) the buffer is flushed as a bulk insert; top‐10 is queried every 250 ms  
 
-3. **Databases (Redis & ClickHouse)**  
-   - Redis at `localhost:6379` (in-memory, very fast for single increments)  
-   - ClickHouse at `localhost:8123` (columnar, disk-based, extremely efficient for bulk writes and analytics)  
+3. **Datastores**  
+   - **Redis** for low-latency single-row increments (`localhost:6379`)  
+   - **ClickHouse** for high-throughput batch analytics (`localhost:8123` & `9000`)  
 
 ---
 
 ## Prerequisites
 
-- **Node.js** v16+ and npm  
-- **Docker** & **Docker Compose** (or ability to run standalone `docker run` commands)  
-- A modern browser (Chrome/Firefox/Edge) to run the React front end  
-- `hey` (optional) for benchmarking, or any HTTP load tester  
+- **Node.js** v16 or higher (with npm)  
+- **Docker** (with Docker Compose) or ability to run `docker run`  
+- A modern web browser (Chrome, Firefox, etc.)  
+- (Optional) **hey** installed locally for load testing  
 
 ---
 
@@ -91,6 +38,111 @@
 
 ### Clone the Repo
 
-```bash
-git clone https://github.com/yourname/cookie-click-db-duel.git
-cd cookie-click-db-duel
+git clone https://github.com/rajatmohan22/cookie-clicker.git
+cd cookie-clicker/src/backend
+
+text
+
+### Environment Variables
+
+Create a file named `.env` in `src/backend` containing:
+
+DB=redis
+
+text
+
+Change to `DB=clickhouse` when switching to ClickHouse mode.
+
+If using ClickHouse, add:
+
+CLICKHOUSE_HOST=http://localhost:8123
+CLICKHOUSE_DB=clickgame
+CLICKHOUSE_USER=default
+CLICKHOUSE_PASSWORD=mysecret
+
+text
+
+### Starting Redis
+
+Run Redis in Docker (or install locally):
+
+docker run -d --name redis-server -p 6379:6379 redis:7-alpine
+
+text
+
+Redis will be available at `localhost:6379`.
+
+### Starting ClickHouse
+
+In `src/backend`, there’s a `docker-compose.yml`. Simply run:
+
+docker-compose up -d
+
+text
+
+This will:
+
+- Launch ClickHouse container exposing 8123 (HTTP) and 9000 (native)
+- Auto‐execute `init-db.sql` to create `clickgame` database and `clicks` table
+
+### Installing Dependencies
+
+From `src/backend`, install Node.js packages:
+
+npm install
+
+text
+
+### Running the Backend
+
+With environment set (`DB=redis` or `DB=clickhouse`), start the server:
+
+node index.js
+
+text
+
+You should see console output confirming the mode and any ClickHouse schema setup.
+
+### Running the Front End
+
+Open a new terminal, go to the front-end folder:
+
+cd ../frontend
+npm install
+npm run dev
+
+text
+
+Visit [http://localhost:5173](http://localhost:5173) in your browser.
+
+Click “🍪 HIT ME!” to send clicks, watch the live leaderboard update via WebSocket.
+
+---
+
+## Benchmarking with hey
+
+### Redis-Only Throughput
+
+Ensure `DB=redis` and backend is running (`node index.js`).
+
+Run:
+
+hey -z 30s -c 200 -m POST
+-H "Content-Type: application/json"
+-d '{"user":"bot"}'
+http://localhost:8080/hit
+
+text
+
+Observe ~29k req/sec for pure ZINCRBY increments (with no extra ranking).
+
+### ClickHouse Batched Throughput
+
+Ensure `DB=clickhouse` and backend is running.
+
+Run:
+
+hey -z 30s -c 200 -m POST
+-H "Content-Type: application/json"
+-d '{"user":"bot"}'
+http://localhost:8080/hit-fast
