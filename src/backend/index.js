@@ -79,7 +79,6 @@ app.get("/", (_, res) => {
 });
 
 app.post("/hit", async (req, res) => {
-  console.log("req.body:", req.body);
   const { user } = req.body || {};
   if (!user) {
     return res.status(400).json({ error: "user required." });
@@ -135,7 +134,6 @@ const topN = async (n = 10) => {
     format: "JSON",
   });
   const result = await stream.json();
-  console.log("ClickHouse result:", result.data);
   return result.data;
 };
 
