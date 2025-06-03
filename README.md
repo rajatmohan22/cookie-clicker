@@ -92,7 +92,7 @@ Before you begin, ensure you have the following installed:
 ## Project Structure
 
 ```
-your-repo/
+cookie-clicker/
 ├── src/
 │   ├── backend/        # Backend source code
 │   │   ├── index.js    # Main backend entry point
