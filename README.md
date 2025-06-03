@@ -93,14 +93,22 @@ Before you begin, ensure you have the following installed:
 
 ```
 cookie-clicker/
+├── .gitignore
+├── README.md
+├── index.html
+├── package.json
+├── public/
+│   └── ...
 ├── src/
-│   ├── backend/        # Backend source code
-│   │   ├── index.js    # Main backend entry point
-│   │   ├── ...         # Other backend files
-│   ├── ...             # Frontend source code
-├── docker-compose.yml  # Docker Compose configuration for backend services
-├── package.json        # Frontend dependencies and scripts
-├── README.md           # This file
+│   ├── backend/
+│   │   ├── docker-compose.yml
+│   │   ├── index.js
+│   │   └── ...
+│   ├── components/
+│   ├── App.jsx
+│   ├── main.jsx
+│   └── ...
+└── ...
 ```
 
 ## Contributing
